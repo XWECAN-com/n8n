@@ -3,6 +3,9 @@ ARG NODE_VERSION=20
 # 1. Create an image to build n8n
 FROM --platform=linux/amd64 n8nio/base:${NODE_VERSION} as builder
 
+# Install dom-parser globally using pnpm
+RUN pnpm add -g dom-parser
+
 # Build the application from source
 WORKDIR /src
 COPY . /src
@@ -32,12 +35,12 @@ COPY --from=builder /compiled /usr/local/lib/node_modules/n8n
 COPY docker/images/n8n/docker-entrypoint.sh /
 
 RUN \
-	cd /usr/local/lib/node_modules/n8n && \
-	npm rebuild sqlite3 && \
-	cd - && \
-	ln -s /usr/local/lib/node_modules/n8n/bin/n8n /usr/local/bin/n8n && \
-	mkdir .n8n && \
-	chown node:node .n8n
+    cd /usr/local/lib/node_modules/n8n && \
+    npm rebuild sqlite3 && \
+    cd - && \
+    ln -s /usr/local/lib/node_modules/n8n/bin/n8n /usr/local/bin/n8n && \
+    mkdir .n8n && \
+    chown node:node .n8n
 
 ENV SHELL /bin/sh
 USER node
