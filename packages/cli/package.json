@@ -176,7 +176,6 @@
     "xmllint-wasm": "3.0.1",
     "xss": "catalog:",
     "yamljs": "0.3.0",
-    "zod": "catalog:",
-    "@xwecan/n8n-nodes-brightdata": "github:XWECAN-com/n8n-nodes-brightdata"
+    "zod": "catalog:"
   }
 }
