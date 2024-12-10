@@ -25,7 +25,7 @@ describe('TaskRunnerProcess', () => {
 	const logger = mockInstance(Logger);
 	const runnerConfig = mockInstance(TaskRunnersConfig);
 	runnerConfig.enabled = true;
-	runnerConfig.mode = 'internal_childprocess';
+	runnerConfig.mode = 'internal';
 	const authService = mock<TaskRunnerAuthService>();
 	let taskRunnerProcess = new TaskRunnerProcess(logger, runnerConfig, authService, mock());
 
@@ -39,7 +39,7 @@ describe('TaskRunnerProcess', () => {
 
 			expect(() => new TaskRunnerProcess(logger, runnerConfig, authService, mock())).toThrow();
 
-			runnerConfig.mode = 'internal_childprocess';
+			runnerConfig.mode = 'internal';
 		});
 
 		it('should register listener for `runner:failed-heartbeat-check` event', () => {
@@ -76,6 +76,7 @@ describe('TaskRunnerProcess', () => {
 			'N8N_VERSION',
 			'ENVIRONMENT',
 			'DEPLOYMENT_NAME',
+			'GENERIC_TIMEZONE',
 		])('should propagate %s from env as is', async (envVar) => {
 			jest.spyOn(authService, 'createGrantToken').mockResolvedValue('grantToken');
 			process.env[envVar] = 'custom value';

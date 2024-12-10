@@ -42,10 +42,6 @@ export class TaskRunnerProcess extends TypedEmitter<TaskRunnerProcessEventMap> {
 		return this._runPromise;
 	}
 
-	private get useLauncher() {
-		return this.runnerConfig.mode === 'internal_launcher';
-	}
-
 	private process: ChildProcess | null = null;
 
 	private _runPromise: Promise<void> | null = null;
@@ -58,6 +54,7 @@ export class TaskRunnerProcess extends TypedEmitter<TaskRunnerProcessEventMap> {
 
 	private readonly passthroughEnvVars = [
 		'PATH',
+		'GENERIC_TIMEZONE',
 		'NODE_FUNCTION_ALLOW_BUILTIN',
 		'NODE_FUNCTION_ALLOW_EXTERNAL',
 		'N8N_SENTRY_DSN',
@@ -98,31 +95,19 @@ export class TaskRunnerProcess extends TypedEmitter<TaskRunnerProcessEventMap> {
 
 		const grantToken = await this.authService.createGrantToken();
 
-		const n8nUri = `127.0.0.1:${this.runnerConfig.port}`;
-		this.process = this.useLauncher
-			? this.startLauncher(grantToken, n8nUri)
-			: this.startNode(grantToken, n8nUri);
+		const taskBrokerUri = `http://127.0.0.1:${this.runnerConfig.port}`;
+		this.process = this.startNode(grantToken, taskBrokerUri);
 
 		forwardToLogger(this.logger, this.process, '[Task Runner]: ');
 
 		this.monitorProcess(this.process);
 	}
 
-	startNode(grantToken: string, n8nUri: string) {
+	startNode(grantToken: string, taskBrokerUri: string) {
 		const startScript = require.resolve('@n8n/task-runner/start');
 
 		return spawn('node', [startScript], {
-			env: this.getProcessEnvVars(grantToken, n8nUri),
-		});
-	}
-
-	startLauncher(grantToken: string, n8nUri: string) {
-		return spawn(this.runnerConfig.launcherPath, ['launch', this.runnerConfig.launcherRunner], {
-			env: {
-				...this.getProcessEnvVars(grantToken, n8nUri),
-				// For debug logging if enabled
-				RUST_LOG: process.env.RUST_LOG,
-			},
+			env: this.getProcessEnvVars(grantToken, taskBrokerUri),
 		});
 	}
 
@@ -133,11 +118,7 @@ export class TaskRunnerProcess extends TypedEmitter<TaskRunnerProcessEventMap> {
 		this.isShuttingDown = true;
 
 		// TODO: Timeout & force kill
-		if (this.useLauncher) {
-			await this.killLauncher();
-		} else {
-			this.killNode();
-		}
+		this.killNode();
 		await this._runPromise;
 
 		this.isShuttingDown = false;
@@ -147,11 +128,7 @@ export class TaskRunnerProcess extends TypedEmitter<TaskRunnerProcessEventMap> {
 	async forceRestart() {
 		if (!this.process) return;
 
-		if (this.useLauncher) {
-			await this.killLauncher(); // @TODO: Implement SIGKILL in launcher
-		} else {
-			this.process.kill('SIGKILL');
-		}
+		this.process.kill('SIGKILL');
 
 		await this._runPromise;
 	}
@@ -160,24 +137,6 @@ export class TaskRunnerProcess extends TypedEmitter<TaskRunnerProcessEventMap> {
 		if (!this.process) return;
 
 		this.process.kill();
-	}
-
-	async killLauncher() {
-		if (!this.process?.pid) {
-			return;
-		}
-
-		const killProcess = spawn(this.runnerConfig.launcherPath, [
-			'kill',
-			this.runnerConfig.launcherRunner,
-			this.process.pid.toString(),
-		]);
-
-		await new Promise<void>((resolve) => {
-			killProcess.on('exit', () => {
-				resolve();
-			});
-		});
 	}
 
 	private monitorProcess(taskRunnerProcess: ChildProcess) {
@@ -200,10 +159,10 @@ export class TaskRunnerProcess extends TypedEmitter<TaskRunnerProcessEventMap> {
 		}
 	}
 
-	private getProcessEnvVars(grantToken: string, n8nUri: string) {
+	private getProcessEnvVars(grantToken: string, taskBrokerUri: string) {
 		const envVars: Record<string, string> = {
 			N8N_RUNNERS_GRANT_TOKEN: grantToken,
-			N8N_RUNNERS_N8N_URI: n8nUri,
+			N8N_RUNNERS_TASK_BROKER_URI: taskBrokerUri,
 			N8N_RUNNERS_MAX_PAYLOAD: this.runnerConfig.maxPayload.toString(),
 			N8N_RUNNERS_MAX_CONCURRENCY: this.runnerConfig.maxConcurrency.toString(),
 			...this.getPassthroughEnvVars(),

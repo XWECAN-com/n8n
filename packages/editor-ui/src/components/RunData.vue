@@ -46,6 +46,7 @@ import { useExternalHooks } from '@/composables/useExternalHooks';
 import { useI18n } from '@/composables/useI18n';
 import { useNodeHelpers } from '@/composables/useNodeHelpers';
 import { useNodeType } from '@/composables/useNodeType';
+import { useSettingsStore } from '@/stores/settings.store';
 import type { PinDataSource, UnpinDataSource } from '@/composables/usePinnedData';
 import { usePinnedData } from '@/composables/usePinnedData';
 import { useTelemetry } from '@/composables/useTelemetry';
@@ -86,8 +87,11 @@ const LazyRunDataTable = defineAsyncComponent(
 const LazyRunDataJson = defineAsyncComponent(
 	async () => await import('@/components/RunDataJson.vue'),
 );
-const LazyRunDataSchema = defineAsyncComponent(
-	async () => await import('@/components/RunDataSchema.vue'),
+
+const LazyRunDataSchema = defineAsyncComponent(async () =>
+	useSettingsStore().settings.virtualSchemaView
+		? await import('@/components/VirtualSchema.vue')
+		: await import('@/components/RunDataSchema.vue'),
 );
 const LazyRunDataHtml = defineAsyncComponent(
 	async () => await import('@/components/RunDataHtml.vue'),
@@ -120,6 +124,7 @@ type Props = {
 	isProductionExecutionPreview?: boolean;
 	isPaneActive?: boolean;
 	hidePagination?: boolean;
+	calloutMessage?: string;
 };
 
 const props = withDefaults(defineProps<Props>(), {
@@ -133,6 +138,7 @@ const props = withDefaults(defineProps<Props>(), {
 	mappingEnabled: false,
 	isExecuting: false,
 	hidePagination: false,
+	calloutMessage: undefined,
 });
 const emit = defineEmits<{
 	search: [search: string];
@@ -1425,6 +1431,12 @@ defineExpose({ enterEditMode });
 		</div>
 
 		<slot v-if="!displaysMultipleNodes" name="before-data" />
+
+		<div v-if="props.calloutMessage" :class="$style.hintCallout">
+			<N8nCallout theme="secondary" data-test-id="run-data-callout">
+				<N8nText v-n8n-html="props.calloutMessage" size="small"></N8nText>
+			</N8nCallout>
+		</div>
 
 		<N8nCallout
 			v-for="hint in getNodeHints()"
