@@ -1,7 +1,7 @@
 import type { ValidationError } from 'class-validator';
 import { validate } from 'class-validator';
 import { rm as fsRm } from 'fs/promises';
-import { Cipher, InstanceSettings } from 'n8n-core';
+import { Cipher, InstanceSettings, Logger } from 'n8n-core';
 import { ApplicationError, jsonParse } from 'n8n-workflow';
 import { writeFile, chmod, readFile } from 'node:fs/promises';
 import path from 'path';
@@ -9,7 +9,6 @@ import Container, { Service } from 'typedi';
 
 import config from '@/config';
 import { SettingsRepository } from '@/databases/repositories/settings.repository';
-import { Logger } from '@/logging/logger.service';
 
 import {
 	SOURCE_CONTROL_SSH_FOLDER,
@@ -41,7 +40,7 @@ export class SourceControlPreferencesService {
 		this.sshKeyName = path.join(this.sshFolder, SOURCE_CONTROL_SSH_KEY_NAME);
 	}
 
-	public get sourceControlPreferences(): SourceControlPreferences {
+	get sourceControlPreferences(): SourceControlPreferences {
 		return {
 			...this._sourceControlPreferences,
 			connected: this._sourceControlPreferences.connected ?? false,
@@ -49,14 +48,14 @@ export class SourceControlPreferencesService {
 	}
 
 	// merge the new preferences with the existing preferences when setting
-	public set sourceControlPreferences(preferences: Partial<SourceControlPreferences>) {
+	set sourceControlPreferences(preferences: Partial<SourceControlPreferences>) {
 		this._sourceControlPreferences = SourceControlPreferences.merge(
 			preferences,
 			this._sourceControlPreferences,
 		);
 	}
 
-	public isSourceControlSetup() {
+	isSourceControlSetup() {
 		return (
 			this.isSourceControlLicensedAndEnabled() &&
 			this.getPreferences().repositoryUrl &&

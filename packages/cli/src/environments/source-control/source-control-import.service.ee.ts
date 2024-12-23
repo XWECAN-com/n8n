@@ -1,13 +1,8 @@
 // eslint-disable-next-line n8n-local-rules/misplaced-n8n-typeorm-import
 import { In } from '@n8n/typeorm';
 import glob from 'fast-glob';
-import { Credentials, InstanceSettings } from 'n8n-core';
-import {
-	ApplicationError,
-	jsonParse,
-	ErrorReporterProxy as ErrorReporter,
-	ensureError,
-} from 'n8n-workflow';
+import { Credentials, ErrorReporter, InstanceSettings, Logger } from 'n8n-core';
+import { ApplicationError, jsonParse, ensureError } from 'n8n-workflow';
 import { readFile as fsReadFile } from 'node:fs/promises';
 import path from 'path';
 import { Container, Service } from 'typedi';
@@ -28,7 +23,6 @@ import { VariablesRepository } from '@/databases/repositories/variables.reposito
 import { WorkflowTagMappingRepository } from '@/databases/repositories/workflow-tag-mapping.repository';
 import { WorkflowRepository } from '@/databases/repositories/workflow.repository';
 import type { IWorkflowToImport } from '@/interfaces';
-import { Logger } from '@/logging/logger.service';
 import { isUniqueConstraintError } from '@/response-helper';
 import { assertNever } from '@/utils';
 
@@ -56,6 +50,7 @@ export class SourceControlImportService {
 
 	constructor(
 		private readonly logger: Logger,
+		private readonly errorReporter: ErrorReporter,
 		private readonly variablesService: VariablesService,
 		private readonly activeWorkflowManager: ActiveWorkflowManager,
 		private readonly tagRepository: TagRepository,
@@ -69,7 +64,7 @@ export class SourceControlImportService {
 		);
 	}
 
-	public async getRemoteVersionIdsFromFiles(): Promise<SourceControlWorkflowVersionId[]> {
+	async getRemoteVersionIdsFromFiles(): Promise<SourceControlWorkflowVersionId[]> {
 		const remoteWorkflowFiles = await glob('*.json', {
 			cwd: this.workflowExportFolder,
 			absolute: true,
@@ -95,7 +90,7 @@ export class SourceControlImportService {
 		);
 	}
 
-	public async getLocalVersionIdsFromDb(): Promise<SourceControlWorkflowVersionId[]> {
+	async getLocalVersionIdsFromDb(): Promise<SourceControlWorkflowVersionId[]> {
 		const localWorkflows = await Container.get(WorkflowRepository).find({
 			select: ['id', 'name', 'versionId', 'updatedAt'],
 		});
@@ -104,7 +99,7 @@ export class SourceControlImportService {
 			if (local.updatedAt instanceof Date) {
 				updatedAt = local.updatedAt;
 			} else {
-				ErrorReporter.warn('updatedAt is not a Date', {
+				this.errorReporter.warn('updatedAt is not a Date', {
 					extra: {
 						type: typeof local.updatedAt,
 						value: local.updatedAt,
@@ -123,7 +118,7 @@ export class SourceControlImportService {
 		}) as SourceControlWorkflowVersionId[];
 	}
 
-	public async getRemoteCredentialsFromFiles(): Promise<
+	async getRemoteCredentialsFromFiles(): Promise<
 		Array<ExportableCredential & { filename: string }>
 	> {
 		const remoteCredentialFiles = await glob('*.json', {
@@ -150,9 +145,7 @@ export class SourceControlImportService {
 		>;
 	}
 
-	public async getLocalCredentialsFromDb(): Promise<
-		Array<ExportableCredential & { filename: string }>
-	> {
+	async getLocalCredentialsFromDb(): Promise<Array<ExportableCredential & { filename: string }>> {
 		const localCredentials = await Container.get(CredentialsRepository).find({
 			select: ['id', 'name', 'type'],
 		});
@@ -164,7 +157,7 @@ export class SourceControlImportService {
 		})) as Array<ExportableCredential & { filename: string }>;
 	}
 
-	public async getRemoteVariablesFromFile(): Promise<Variables[]> {
+	async getRemoteVariablesFromFile(): Promise<Variables[]> {
 		const variablesFile = await glob(SOURCE_CONTROL_VARIABLES_EXPORT_FILE, {
 			cwd: this.gitFolder,
 			absolute: true,
@@ -178,11 +171,11 @@ export class SourceControlImportService {
 		return [];
 	}
 
-	public async getLocalVariablesFromDb(): Promise<Variables[]> {
+	async getLocalVariablesFromDb(): Promise<Variables[]> {
 		return await this.variablesService.getAllCached();
 	}
 
-	public async getRemoteTagsAndMappingsFromFile(): Promise<{
+	async getRemoteTagsAndMappingsFromFile(): Promise<{
 		tags: TagEntity[];
 		mappings: WorkflowTagMapping[];
 	}> {
@@ -201,7 +194,7 @@ export class SourceControlImportService {
 		return { tags: [], mappings: [] };
 	}
 
-	public async getLocalTagsAndMappingsFromDb(): Promise<{
+	async getLocalTagsAndMappingsFromDb(): Promise<{
 		tags: TagEntity[];
 		mappings: WorkflowTagMapping[];
 	}> {
@@ -214,7 +207,7 @@ export class SourceControlImportService {
 		return { tags: localTags, mappings: localMappings };
 	}
 
-	public async importWorkflowFromWorkFolder(candidates: SourceControlledFile[], userId: string) {
+	async importWorkflowFromWorkFolder(candidates: SourceControlledFile[], userId: string) {
 		const personalProject =
 			await Container.get(ProjectRepository).getPersonalProjectForUserOrFail(userId);
 		const workflowManager = this.activeWorkflowManager;
@@ -301,7 +294,7 @@ export class SourceControlImportService {
 		}>;
 	}
 
-	public async importCredentialsFromWorkFolder(candidates: SourceControlledFile[], userId: string) {
+	async importCredentialsFromWorkFolder(candidates: SourceControlledFile[], userId: string) {
 		const personalProject =
 			await Container.get(ProjectRepository).getPersonalProjectForUserOrFail(userId);
 		const candidateIds = candidates.map((c) => c.id);
@@ -375,7 +368,7 @@ export class SourceControlImportService {
 		return importCredentialsResult.filter((e) => e !== undefined);
 	}
 
-	public async importTagsFromWorkFolder(candidate: SourceControlledFile) {
+	async importTagsFromWorkFolder(candidate: SourceControlledFile) {
 		let mappedTags;
 		try {
 			this.logger.debug(`Importing tags from file ${candidate.file}`);
@@ -437,7 +430,7 @@ export class SourceControlImportService {
 		return mappedTags;
 	}
 
-	public async importVariablesFromWorkFolder(
+	async importVariablesFromWorkFolder(
 		candidate: SourceControlledFile,
 		valueOverrides?: {
 			[key: string]: string;
