@@ -24,6 +24,17 @@ RUN NODE_ENV=production DOCKER_BUILD=true pnpm --filter=n8n --prod --no-optional
 FROM n8nio/base:${NODE_VERSION}
 ENV NODE_ENV=production
 
+# Add Chrome dependencies for Puppeteer
+USER root
+RUN apt-get update && apt-get install -y \
+    chromium \
+    chromium-driver \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Puppeteer
+RUN npm install -g puppeteer
+USER node
+
 ARG N8N_RELEASE_TYPE=dev
 ENV N8N_RELEASE_TYPE=${N8N_RELEASE_TYPE}
 
@@ -52,8 +63,8 @@ RUN \
 
 RUN \
 	cd /usr/local/lib/node_modules/n8n && \
-	npm rebuild sqlite3 && \
-	cd - && \
+  npm rebuild sqlite3 puppeteer && \
+  cd - && \
 	ln -s /usr/local/lib/node_modules/n8n/bin/n8n /usr/local/bin/n8n && \
 	mkdir .n8n && \
 	chown node:node .n8n
