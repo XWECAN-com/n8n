@@ -128,7 +128,6 @@ function openContextMenu(event: MouseEvent) {
 	<div :class="classes" :style="styles" :data-test-id="dataTestId" @contextmenu="openContextMenu">
 		<CanvasNodeTooltip v-if="renderOptions.tooltip" :visible="showTooltip" />
 		<slot />
-		<CanvasNodeTriggerIcon v-if="renderOptions.trigger" />
 		<CanvasNodeStatusIcons v-if="!isDisabled" :class="$style.statusIcons" />
 		<CanvasNodeDisabledStrikeThrough v-if="isStrikethroughVisible" />
 		<div :class="$style.description">
@@ -155,7 +154,7 @@ function openContextMenu(event: MouseEvent) {
 	--canvas-node-border-width: 2px;
 	--configurable-node--min-input-count: 4;
 	--configurable-node--input-width: 64px;
-	--configurable-node--icon-offset: 40px;
+	--configurable-node--icon-offset: 30px;
 	--configurable-node--icon-size: 30px;
 	--trigger-node--border-radius: 36px;
 	--canvas-node--status-icons-offset: var(--spacing-3xs);
@@ -212,6 +211,7 @@ function openContextMenu(event: MouseEvent) {
 			position: relative;
 			margin-top: 0;
 			margin-left: var(--spacing-s);
+			margin-right: var(--spacing-s);
 			width: auto;
 			min-width: unset;
 			max-width: calc(
@@ -222,6 +222,10 @@ function openContextMenu(event: MouseEvent) {
 		}
 
 		.label {
+			text-align: left;
+		}
+
+		.subtitle {
 			text-align: left;
 		}
 
